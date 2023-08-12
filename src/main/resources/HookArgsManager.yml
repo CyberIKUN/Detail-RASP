@@ -1,0 +1,479 @@
+modules:
+  - type: Deserialization #取值：Deserialization、RemoteCodeExecute、SSRF、ExpressionInject、FileOperator、JNDIInject、XXE、SQLInject；
+    hook_class_and_method:
+      - hook_class: java/lang/ObjectInputStream #jdk反序列化
+        hook_method:
+          - resolveClass(Ljava/io/ObjectStreamClass;)Ljava/lang/Class;
+      - hook_class: com/alibaba/fastjson/util/TypeUtils #fastjson反序列化
+        hook_method:
+          - loadClass(Ljava/lang/String;Ljava/lang/ClassLoader;Z)Ljava/lang/Class;
+          - getClassFromMapping(Ljava/lang/String;)Ljava/lang/Class;
+
+      - hook_class: com/fasterxml/jackson/databind/deser/BeanDeserializer #jackson反序列化
+        hook_method:
+          - deserialize(Lcom/fasterxml/jackson/core/JsonParser;Lcom/fasterxml/jackson/databind/DeserializationContext;)Ljava/lang/Object;
+          - deserialize(Lcom/fasterxml/jackson/core/JsonParser;Lcom/fasterxml/jackson/databind/DeserializationContext;Ljava/lang/Object;)Ljava/lang/Object;
+
+      - hook_class: com/thoughtworks/xstream/core/AbstractReferenceUnmarshaller #xstream反序列化
+        hook_method:
+          - convert(Ljava/lang/Object;Ljava/lang/Class;Lcom/thoughtworks/xstream/converters/Converter;)Ljava/lang/Object;
+
+      - hook_class: org/yaml/snakeyaml/constructor/BaseConstructor #snakeyaml反序列化
+        hook_method:
+          - constructObject(Lorg/yaml/snakeyaml/nodes/Node;)Ljava/lang/Object;
+    mode: Log #取值范围：Log、Block、Close，不区分大小写，默认为Close
+    check_class: com/briar/check/DeserializationCheck
+    whitelist:
+      -
+    blacklist:
+      json_yaml_class:
+        - org.apache.commons.collections.Transformer
+        - java.lang.Thread
+        - java.net.Socket
+        - java.net.URL
+        - java.net.InetAddress
+        - java.lang.Class
+        - oracle.jdbc.rowset.OracleJDBCRowSet
+        - oracle.jdbc.connector.OracleManagedConnectionFactory
+        - java.lang.UNIXProcess
+        - java.lang.AutoCloseable
+        - java.lang.Runnable
+        - java.util.EventListener
+        - java.io.PrintWriter
+        - java.io.FileInputStream
+        - java.io.FileOutputStream
+        - java.util.PriorityQueue
+      json_yaml_package:
+        - org.apache.commons.collections.functors
+        - org.apache.commons.collections4.functors
+        - org.apache.commons.collections4.comparators
+        - org.python.core
+        - org.apache.tomcat
+        - org.apache.xalan
+        - javax.xml
+        - org.springframework
+        - org.apache.commons.beanutils
+        - org.codehaus.groovy.runtime
+        - javax.net
+        - com.mchange
+        - org.apache.wicket.util
+        - java.util.jar
+        - org.mozilla.javascript
+        - java.rmi
+        - java.util.prefs
+        - com.sun
+        - java.util.logging
+        - org.apache.bcel
+        - org.apache.commons.fileupload
+        - org.hibernate
+        - org.jboss
+        - org.apache.myfaces.context.servlet
+        - org.apache.ibatis.datasource
+        - org.apache.log4j
+        - org.apache.logging
+        - org.apache.commons.dbcp
+        - com.ibatis.sqlmap.engine.datasource
+        - javassist
+        - oracle.net
+        - com.alibaba.fastjson.annotation
+        - com.zaxxer.hikari
+        - ch.qos.logback
+        - com.mysql.cj.jdbc.admin
+        - org.apache.ibatis.parsing
+        - org.apache.ibatis.executor
+        - com.caucho
+      xml_class:
+        - java.io.PrintWriter
+        - java.io.FileInputStream
+        - java.io.FileOutputStream
+        - java.util.PriorityQueue
+        - javax.sql.rowset.BaseRowSet
+        - javax.activation.DataSource
+        - java.nio.channels.Channel
+        - java.io.InputStream
+        - java.lang.ProcessBuilder
+        - java.lang.Runtime
+        - javafx.collections.ObservableList
+        - java.beans.EventHandler
+        - sun.swing.SwingLazyValue
+        - java.io.File
+      xml_package:
+        - sun.reflect
+        - sun.tracing
+        - com.sun.corba
+        - javax.crypto
+        - jdk.nashorn.internal
+        - sun.awt.datatransfer
+        - com.sun.tools
+        - javax.imageio
+        - com.sun.rowset
+      xml_keywords:
+        - .jndi.
+        - .rmi.
+        - .bcel.
+        - .xsltc.trax.TemplatesImpl
+        - .ws.client.sei.
+        - "$URLData"
+        - "$LazyIterator"
+        - "$GetterSetterReflection"
+        - "$PrivilegedGetter"
+        - "$ProxyLazyValue"
+        - "$ServiceNameIterator"
+  - type: JNDIInject
+    hook_class_and_method:
+      - hook_class: com/sun/jndi/toolkit/url/GenericURLContext
+        hook_method:
+          - lookup(Ljava/lang/String;)Ljava/lang/Object;
+          - lookupLink(Ljava/lang/String;)Ljava/lang/Object;
+    mode: Log
+    check_class: com/briar/check/JNDICheck
+    whitelist: #白名单和黑名单不能冲突
+      ip: #微服务地址
+        -
+      domain:
+        -
+    blacklist:
+      protocol:
+        - ldap
+        - rmi
+      ip: #内网ip
+        - 127.0.0.1
+      domain:
+        - localhost
+  - type: RemoteCodeExecute
+    hook_class_and_method:
+      - hook_class: java/lang/ProcessImpl
+        hook_method:
+          - forkAndExec(I[B[B[BI[BI[B[IZ)I
+          - create(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[JZ)J
+      - hook_class: java/lang/UNIXProcess
+        hook_method:
+          - forkAndExec(I;[B;[B;[B;I;[B;I;[B;[I;Z)I;
+    mode: BLOCK
+    check_class: com/briar/check/RCECheck
+    whitelist:
+      -
+    blacklist:
+      all: true #是否拦截所有命令执行，默认为true
+      common_pattern: 'cat.{1,5}/etc/passwd|nc.{1,30}-e.{0,100}/bin/(?:ba)?sh|bash\\s-.{0,4}i.{0,20}/dev/tcp/|subprocess.call\\(.{0,6}/bin/(?:ba)?sh|fsockopen\\(.{1,50}/bin/(?:ba)?sh|perl.{1,80}socket.{1,120}open.{1,80}exec\\(.{1,5}/bin/(?:ba)?sh'
+      dns_cmd_pattern: '(^|\\W)(curl|ping|wget|nslookup|dig)\\W'
+      dns_domain_pattern: '\\.((ceye|exeye|sslip|nip)\\.io|dnslog\\.cn|(vcap|bxss)\\.me|xip\\.(name|io)|burpcollaborator\\.net|tu4\\.org|2xss\\.cc|request\\.bin|requestbin\\.net|pipedream\\.net)'
+      command:
+        #反弹shell，使用contains，名字不同即可绕过，比如将nc改名为nnk
+        - bash
+        - nc
+        - netcat
+        - wget
+        - curl
+        - sh
+        - socat
+        - telnet
+        - python
+        - php
+        - perl
+        - ruby
+        - openssl
+        - powershell
+        - ps
+        #文件操作
+        - vim
+        - vi
+        - echo
+        - mkdir
+        - mv
+        - rm
+        - rmdir
+        - cp
+        - touch
+        - ls
+        - du
+        - df
+        - cat
+        - more
+        - less
+        - tail
+        - pwd
+        - grep
+        - find
+        - sdiff
+        - tac
+        - look
+        - sz
+        - kill
+        - apt-get
+        - yum
+        - apt
+        #权限操作
+        - chmod
+        - su
+        - sudo
+      keywords:
+        #不允许包含如下字符
+        - etc
+        - apache
+        - bin
+        - var
+        - opt
+        - passwd
+        - profile #profile（/etc/profile），用于设置系统级的环境变量和启动程序
+        - cshrc
+        - login
+        - cron
+
+  - type: SSRF
+    hook_class_and_method:
+      - hook_class: java/net/Socket #socket
+        hook_method:
+          - <init>(Ljava/net/SocketAddress;I)V
+      - hook_class: okhttp3/internal/http/RealInterceptorChain #okhttp3
+        hook_method:
+          - proceed(Lokhttp3/Request;)Lokhttp3/Response;
+      - hook_class: com/squareup/okhttp/Call$ApplicationInterceptorChain #okhttp2
+        hook_method:
+          - proceed(Lcom/squareup/okhttp/Request;)Lcom/squareup/okhttp/Response;
+      - hook_class: org/apache/http/impl/client/CloseableHttpClient #httpclient
+        hook_method:
+          - execute(Lorg/apache/http/HttpHost;Lorg/apache/http/HttpRequest;Lorg/apache/http/client/ResponseHandler;)Ljava/lang/Object;
+    mode: Log
+    check_class: com/briar/check/SSRFCheck
+    whitelist:
+      ip:
+        - 183.2.31.2
+      domain:
+        - my.com
+    blacklist:
+      protocol:
+        - file
+        - http
+        - https
+        - gopher
+      ip:
+        - 127.0.0.1
+      domain:
+        - localhost
+
+
+  - type: FileOperator
+    hook_class_and_method:
+      - hook_class: java/io/FileInputStream #文件读取/下载
+        hook_method:
+          - <init>(Ljava/io/File;)V
+      - hook_class: java/io/FileOutputStream #文件写入/上传
+        hook_method:
+          - <init>(Ljava/io/File;Z)V
+      - hook_class: java/io/File
+        hook_method:
+          - delete()Z #文件删除
+          - renameTo(Ljava/io/File;)Z #重命名文件，检测后缀，当成文件上传处理
+          - list()[Ljava/lang/String; #文件清单
+      - hook_class: java/io/RandomAccessFile
+        hook_method:
+          - <init>(Ljava/io/File;Ljava/lang/String;)V #文件操作，当模式包含rw，当成文件写入/上传处理
+      - hook_class: java/nio/file/Files
+        hook_method:
+          - readAllBytes(Ljava/nio/file/Path;)[B #文件读取
+          - newInputStream(Ljava/nio/file/Path;[Ljava/nio/file/OpenOption;)Ljava/io/InputStream; #文件读取
+          - createFile(Ljava/nio/file/Path;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/file/Path; #当成文件写入/上传处理
+          - newOutputStream(Ljava/nio/file/Path;[Ljava/nio/file/OpenOption;)Ljava/io/OutputStream; #准备写文件，当成文件写入/上传处理
+          - copy(Ljava/nio/file/Path;Ljava/nio/file/Path;[Ljava/nio/file/CopyOption;)Ljava/nio/file/Path; #文件复制，当成文件写入/上传处理
+          - move(Ljava/nio/file/Path;Ljava/nio/file/Path;[Ljava/nio/file/CopyOption;)Ljava/nio/file/Path; #文件移动，当成文件写入/上传处理
+          - delete(Ljava/nio/file/Path;)V #文件删除
+          - deleteIfExists#(Ljava/nio/file/Path;)V #文件删除
+          - newDirectoryStream(Ljava/nio/file/Path;)Ljava/nio/file/DirectoryStream; #文件清单
+          - newDirectoryStream(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/DirectoryStream; #文件清单
+          - newDirectoryStream(Ljava/nio/file/Path;Ljava/nio/file/DirectoryStream$Filter;)Ljava/nio/file/DirectoryStream; #文件清单
+      - hook_class: org/apache/commons/fileupload/FileUploadBase
+        hook_method:
+         - parseRequest(Lorg/apache/commons/fileupload/RequestContext;)Ljava/util/List;
+    mode: Log
+    check_class: com/briar/check/FileCheck
+    blacklist:
+      file_extension:
+        - .jsp
+        - .jspx
+        - .asp
+        - .phar
+        - .phtml
+        - .sh
+        - .py
+        - .pl
+        - .rb
+        - .war
+      directory:
+        - /
+        - /home
+        - /etc
+        - /usr
+        - /usr/local
+        - /var/log
+        - /proc
+        - /sys
+        - /root
+        - 'D:\'
+        - 'C:\'
+        - 'E:\'
+      file:
+        - /etc/passwd
+        - /etc/shadow
+        - /etc/sysconfig/network-scripts/ifcfg-eth0
+        - /etc/hosts
+        - /root/.bash_history
+        - /var/lib/tomcat
+        - /root/.ssh/id_rsa
+        - /proc/net/fib_trie
+        - /proc/self/environ
+        - 'C:\boot.ini'
+        - 'C:\Program Files\mysql\my.ini'
+        - 'C:\Windows\repair\sam'
+        - 'C:\Windows\my.ini'
+
+
+
+  - type: SQLInject
+    hook_class_and_method:
+      - hook_class: com/mysql/cj/jdbc/StatementImpl
+        hook_method:
+          - executeInternal(Ljava/lang/String;Z)Z
+          - executeQuery(Ljava/lang/String;)Ljava/sql/ResultSet;
+          - executeUpdateInternal(Ljava/lang/String;ZZ)J
+      - hook_class: com/mysql/cj/jdbc/ClientPreparedStatement
+        hook_method:
+          - execute()Z
+          - executeQuery()Ljava/sql/ResultSet;
+          - executeUpdate()I
+          - executeBatchInternal()[J
+          - executeBatch()[I
+      - hook_class: com/mysql/jdbc/StatementImpl
+        hook_method:
+          - executeInternal(Ljava/lang/String;Z)Z
+          - executeQuery(Ljava/lang/String;)Ljava/sql/ResultSet;
+          - executeUpdateInternal(Ljava/lang/String;ZZ)J
+      - hook_class: com/mysql/jdbc/PreparedStatement
+        hook_method:
+          - execute()Z
+          - executeQuery()Ljava/sql/ResultSet;
+          - executeUpdate()[J
+          - executeBatch()[I
+    mode: Log
+    check_class: com/briar/check/SQLICheck
+    min_length: 16
+    max_length: 65535
+
+
+  - type: ExpressionInject
+    hook_class_and_method:
+      - hook_class: org/springframework/expression/common/TemplateAwareExpressionParser
+        hook_method:
+          - parseExpression(Ljava/lang/String;Lorg/springframework/expression/ParserContext;)Lorg/springframework/expression/Expression; #直接拿到表达式
+      - hook_class: ognl/OgnlParser
+        hook_method:
+          - topLevelExpression()Lognl/Node; #通过Node的toString
+#      - hook_class: org/apache/el/ValueExpressionImpl
+#        hook_method:
+#          - getValue(Ljakarta/el/ELContext;)Ljava/lang/Object; #通过ValueExpressionImpl的getExpressionString方法拿到表达式
+#          - getValue(Ljavax/el/ELContext;)Ljava/lang/Object; #通过ValueExpressionImpl的getExpressionString方法拿到表达式
+#      - hook_class: org/apache/commons/jexl2/ExpressionImpl
+#        hook_method:
+#          - execute(Lorg/apache/commons/jexl2/JexlContext;[Ljava/lang/Object;)Ljava/lang/Object; #通过ExpressionImpl的getExpression方法拿到表达式
+#          - execute(Lorg/apache/commons/jexl2/JexlContext;)Ljava/lang/Object; #通过ExpressionImpl的getExpression方法拿到表达式
+#      - hook_class: org/apache/commons/jexl3/internal/Script
+#        hook_method:
+#          - execute(Lorg/apache/commons/jexl3/JexlContext;)Ljava/lang/Object; #通过Script的getSourceText方法拿到表达式String
+#          - execute(Lorg/apache/commons/jexl3/JexlContext;[Ljava/lang/Object;)Ljava/lang/Object; #通过Script的getSourceText方法拿到表达式String
+#      - hook_class: org/mvel2/MVEL
+#        hook_method:
+#          - compileExpression(Ljava/lang/String;Lorg/mvel2/ParserContext;)Ljava/io/Serializable; #直接提取字符串
+#          - eval(Ljava/lang/String;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Lorg/mvel2/integration/VariableResolverFactory;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Object;Lorg/mvel2/integration/VariableResolverFactory;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/util/Map;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Object;Ljava/util/Map;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Lorg/mvel2/integration/VariableResolverFactory;Ljava/lang/Class;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/util/Map;Ljava/lang/Class;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Object;Lorg/mvel2/integration/VariableResolverFactory;Ljava/lang/Class;)Ljava/lang/Object; #直接提取字符串
+#          - eval(Ljava/lang/String;Ljava/lang/Object;Ljava/util/Map;Ljava/lang/Class;)Ljava/lang/Object; #直接提取字符串
+#          - compileExpression([CLorg/mvel2/ParserContext;)Ljava/io/Serializable; #提取char数组，转成String即为表达式
+#          - eval([C)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Object;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Object;Lorg/mvel2/integration/VariableResolverFactory;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CIILjava/lang/Object;Lorg/mvel2/integration/VariableResolverFactory;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CIILjava/lang/Object;Lorg/mvel2/integration/VariableResolverFactory;Ljava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Object;Ljava/util/Map;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Object;Ljava/util/Map;Ljava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/lang/Object;Lorg/mvel2/integration/VariableResolverFactory;Ljava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLorg/mvel2/integration/VariableResolverFactory;Ljava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - eval([CLjava/util/Map;Ljava/lang/Class;)Ljava/lang/Object; #提取char数组，转成String即为表达式
+#          - compileExpression([CIILorg/mvel2/ParserContext;)Ljava/io/Serializable; #提取char数组和起始位置、偏移量转成String
+    mode: Log
+    check_class: com/briar/check/ExpressionInjectCheck
+    expression_min_length: 30
+    spel_expression_max_length: 200
+    ognl_expression_max_length: 400
+    blacklist:
+      blacklist_spel:
+       - java.lang.Runtime
+       - java.lang.ProcessBuilder
+       - javax.script.ScriptEngineManager
+       - java.lang.System
+       - org.springframework.cglib.core.ReflectUtils
+       - java.io.File
+       - javax.management.remote.rmi.RMIConnector
+      blacklist_ognl:
+       - java.lang.Runtime
+       - java.lang.Class
+       - java.lang.ClassLoader
+       - java.lang.System
+       - java.lang.ProcessBuilder
+       - java.lang.Object
+       - java.lang.Shutdown
+       - ognl.OgnlContext
+       - ognl.TypeConverter
+       - ognl.MemberAccess
+       - _memberAccess
+       - ognl.ClassResolver
+       - java.io.File
+       - javax.script.ScriptEngineManager
+       - excludedClasses
+       - excludedPackageNamePatterns
+       - excludedPackageNames
+       - com.opensymphony.xwork2.ActionContext
+
+
+
+  - type: XXE #hook后直接修改属性主动防御
+    hook_class_and_method:
+      - hook_class: org/dom4j/io/SAXReader
+        hook_method:
+          - read(Lorg/xml/sax/InputSource;)Lorg/dom4j/Document; #获取SAXReader，然后调用setFeature
+      - hook_class: org/jdom/input/SAXBuilder
+        hook_method:
+          - build(Ljava/io/InputStream;)Lorg/jdom/Document; #获取SAXBuilder，然后调用setFeature
+      - hook_class: org/jdom2/input/SAXBuilder
+        hook_method:
+          - build(Lorg/xml/sax/InputSource;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/io/InputStream;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/io/File;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/net/URL;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/io/InputStream;Ljava/lang/String;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/io/Reader;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/io/Reader;Ljava/lang/String;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+          - build(Ljava/lang/String;)Lorg/jdom2/Document; #获取SAXBuilder，然后调用setFeature
+      - hook_class: javax/xml/parsers/DocumentBuilderFactory
+        hook_method:
+          - newInstance()Ljavax/xml/parsers/DocumentBuilderFactory; #获取返回值
+      - hook_class: javax/xml/parsers/DocumentBuilderFactory
+        hook_method:
+          - newInstance()Ljavax/xml/parsers/DocumentBuilderFactory; #拿到返回值
+      - hook_class: javax/xml/stream/XMLInputFactory
+        hook_method:
+          - newInstance()Ljavax/xml/stream/XMLInputFactory; #拿到返回值
+      - hook_class: org/xml/sax/helpers/XMLReaderFactory
+        hook_method:
+          - createXMLReader()Lorg/xml/sax/XMLReader; #拿到返回值
+    mode: Log
+    check_class: com/briar/check/XXECheck

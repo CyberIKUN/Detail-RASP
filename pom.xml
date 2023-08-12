@@ -1,0 +1,124 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.briar</groupId>
+  <artifactId>Detail-RASP</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>Detail-RASP</name>
+
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+    <tools.version>1.8.0</tools.version>
+    <maven.compiler.version>3.1</maven.compiler.version>
+    <maven.shade.version>3.1.1</maven.shade.version>
+    <jdk.version>8</jdk.version>
+    <snakeyaml.version>1.33</snakeyaml.version>
+    <druid.version>1.2.15</druid.version>
+    <mysql.connector.version>5.1.49</mysql.connector.version>
+  </properties>
+
+  <dependencies>
+
+
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+      <version>${snakeyaml.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.10.1</version>
+    </dependency>
+
+
+  </dependencies>
+
+  <build>
+    <!-- 指定打成jar包的名称 -->
+    <finalName>Detail-RASP-Agent</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven.compiler.version}</version>
+        <configuration>
+          <source>${jdk.version}</source>
+          <target>${jdk.version}</target>
+          <encoding>${maven.compiler.encoding}</encoding>
+          <skip>true</skip>
+          <compilerArguments>
+            <!-- 不然maven install时会找不到jdk.internal.org.objectweb.asm包 -->
+            <bootclasspath>${java.home}/lib/rt.jar</bootclasspath>
+          </compilerArguments>
+        </configuration>
+      </plugin>
+
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>${maven.shade.version}</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/maven/</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Premain-Class>com.briar.Agent</Premain-Class>
+                    <Agent-Class>com.briar.Agent</Agent-Class>
+                    <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                    <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                    <Main-Class>com.briar.Agent</Main-Class>
+                    <!-- 可以将tools.jar解压打包进最后的jar包，也可以使用不解压，只指定jar包的classpath -->
+<!--                    <Class-Path>. tools.jar</Class-Path>-->
+                    <Can-Set-Native-Method-Prefix>true</Can-Set-Native-Method-Prefix>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+              <relocations>
+                <relocation>
+                  <!-- 源包名 -->
+                  <pattern>org.yaml</pattern>
+                  <!-- 目的包名 -->
+                  <shadedPattern>com.briar.org.yaml</shadedPattern>
+                </relocation>
+                <relocation>
+                  <!-- 源包名 -->
+                  <pattern>com.google.gson</pattern>
+                  <!-- 目的包名 -->
+                  <shadedPattern>com.briar.com.google.gson</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+</project>
